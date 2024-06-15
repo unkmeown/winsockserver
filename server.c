@@ -9,81 +9,89 @@
 #define PORT 888
 #define SERVER_IP "127.0.0.1"
 #define MAX_CLIENT_MSG_LEN 1000
+#define DEFAULT_BUFLEN 512
 
 int main()
 {
-WSADATA wsa;
-SOCKET mySocket, acceptSocket;
-struct sockaddr_in server, client;
-int sockAddrInLength = sizeof(struct sockaddr_in);
-char clientMessage[MAX_CLIENT_MSG_LEN];
-int clientMessageLength;
-char* message;
+    WSADATA wsa;
+    SOCKET mySocket, acceptSocket;
+    struct sockaddr_in server, client;
+    int sockAddrInLength = sizeof(struct sockaddr_in);
+    char clientMessage[MAX_CLIENT_MSG_LEN];
+    int clientMessageLength;
+    char* message;
 
 
-int running = 1;
+    int running = 1;
+
+    if(WSAStartup(MAKEWORD(2,2), &wsa) != 0)
+    {
+        fprintf(stderr, "WSAStartup failed.\n");
+        return EXIT_FAILURE;
+    }
+    printf("WSAStartup succeded.\n");
 
 
-if(WSAStartup(MAKEWORD(2,2), &wsa) != 0)
-{
-    fprintf(stderr, "WSAStartup failed.\n");
-    return EXIT_FAILURE;
-}
-printf("WSAStartup succeded.\n");
+    mySocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (mySocket == INVALID_SOCKET)
+    {
+        fprintf(stderr, "Socket creation failed.\n");
+        return EXIT_FAILURE;
+    }
+    printf("Socket creation succeeded.\n");
 
 
-mySocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-if (mySocket == INVALID_SOCKET)
-{
-    fprintf(stderr, "Socket creation failed.\n");
-    return EXIT_FAILURE;
-}
-printf("Socket creation succeeded.\n");
+    server.sin_addr.s_addr = INADDR_ANY;
+    server.sin_family = AF_INET;
+    server.sin_port = htons(PORT);
 
 
-server.sin_addr.s_addr = INADDR_ANY;
-server.sin_family = AF_INET;
-server.sin_port = htons(PORT);
+    if (bind(mySocket, (struct sockaddr*) &server, sizeof server) == SOCKET_ERROR)
+    {
+        fprintf(stderr, "Binding socket on port %d failed.\n", PORT);
+        return EXIT_FAILURE;
+    }
+    printf("Binding socket on port %d successfully.\n", PORT);
 
 
-if (bind(mySocket, (struct sockaddr*) &server, sizeof server) == SOCKET_ERROR)
-{
-    fprintf(stderr, "Binding socket on port %d failed.\n", PORT);
-    return EXIT_FAILURE;
-}
-printf("Binding socket on port %d successfully.\n", PORT);
-
-
-while (running)
-{
-        listen(mySocket, 1);
-        printf("Waiting for a connection...\n");
-
-
-        acceptSocket = accept(mySocket, (struct sockaddr*) &client, &sockAddrInLength);
-        if (acceptSocket == INVALID_SOCKET)
+    while (running)
         {
-            fprintf(stderr, "Accept failed.\n");
-            return EXIT_FAILURE;
+            listen(mySocket, 1);
+            printf("Waiting for a connection...\n");
+
+
+            acceptSocket = accept(mySocket, (struct sockaddr*) &client, &sockAddrInLength);
+            if (acceptSocket == INVALID_SOCKET)
+            {
+                fprintf(stderr, "Accept failed.\n");
+                closesocket(acceptSocket);
+                return EXIT_FAILURE;
+            }
+            printf("Accept succeeded.\n");
+
+
+            int loop = 1;
+
+            while (loop)
+            {
+                if ((clientMessageLength = recv(acceptSocket, clientMessage, sizeof clientMessage, 0)) == SOCKET_ERROR)
+                {
+                    fprintf(stderr, "Recv failed.\n");
+                    closesocket(acceptSocket);
+                    break;
+                }
+                else if (clientMessageLength == 0)
+                {
+                    printf("Connection closed by client.\n");
+                    closesocket(acceptSocket);
+                    break;
+                }
+                else
+                {
+                    printf("Recv - ");
+                    clientMessage[clientMessageLength] = '\0';
+                    printf("Client: %s\n", clientMessage);
+                }
+            }
         }
-        printf("Accept succeeded.\n");
-
-
-        if ((clientMessageLength = recv(acceptSocket, clientMessage, sizeof clientMessage, 0)) == SOCKET_ERROR)
-        {
-            fprintf(stderr, "Recv failed.\n");
-            return EXIT_FAILURE;
-        }
-        printf("Recv succeeded.\n");
-
-
-        printf("Data:\n");
-        clientMessage[clientMessageLength] = NULL;     
-	      printf("Client: %s\n", clientMessage);
-}
-closesocket(mySocket);
-WSACleanup();
-getchar();
-return 0;
-
 }
